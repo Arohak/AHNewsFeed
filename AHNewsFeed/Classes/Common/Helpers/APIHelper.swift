@@ -44,9 +44,6 @@ struct APIHelper {
                          encoding: URLEncoding.default,
                          headers: headers )
             .responseJSON { response in
-                let parameters  = parameters == nil ? "": "\nParams: " + "\(parameters!)"
-                let result  = "\nRequest: " + method.rawValue + " " + URL + parameters
-                print(result)
                 
                 switch response.result {
                 case .success(let data):
@@ -76,11 +73,6 @@ struct APIHelper {
             return nil
             
         default:
-            let message = data["message"].stringValue
-            if !message.isEmpty { UIHelper.showHUD(message) }
-            print("Response:")
-            print(data)
-
             return data
         }
     }
