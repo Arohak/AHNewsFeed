@@ -17,7 +17,6 @@ target 'AHNewsFeed' do
   pod 'SwiftyJSON'
   pod 'Reusable'
   pod 'PureLayout'
-  pod 'Texture'
   pod 'PKHUD'
 
 end

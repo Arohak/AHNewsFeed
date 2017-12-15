@@ -2,13 +2,13 @@
 //  FeedsCollectionDataProvider.swift
 //  AHNewsFeed
 //
-//  Created by Ara Hakobyan on 12/12/2017.
+//  Created by Ara Hakobyan on 15/12/2017.
 //  Copyright © 2017 Ara Hakobyan. All rights reserved.
 //
 
 import UIKit
 
-protocol FeedsCollectionDataProviderProtocol: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+protocol FeedCollectionDataProviderProtocol: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     
     associatedtype T
     var items:[T] {get}
@@ -16,9 +16,11 @@ protocol FeedsCollectionDataProviderProtocol: UICollectionViewDataSource, UIColl
     
     init(with collectionView: UICollectionView)
     func updateCollectionView(with items: [T])
+    func insertNewItemInCollectionView(with item: T)
+    func deleteItemFromCollectionView(with item: T)
 }
 
-final class FeedsCollectionDataProvider: NSObject {
+final class FeedCollectionDataProvider: NSObject {
     
     var items: [FeedViewModelType] = []
     weak var collectionView: UICollectionView?
@@ -27,33 +29,15 @@ final class FeedsCollectionDataProvider: NSObject {
     
     required init(with collectionView: UICollectionView) {
         super.init()
-
+        
         self.collectionView = collectionView
         self.collectionView?.dataSource = self
         self.collectionView?.delegate = self
     }
-
-    func updateCollectionView(with items: [FeedViewModelType]) {
-        self.items = items
-        self.collectionView?.reloadData()
-    }
-    
-    func updateCollectionViewItem(with item: FeedViewModelType) {
-        guard let index = self.items.index(where: { $0.id == item.id }) else { return }
-        
-        let indexPath = IndexPath(row: index, section: 0)
-        self.collectionView?.reloadItems(at: [indexPath])
-    }
-    
-    func removeCollectionViewItem(with item: FeedViewModelType) {
-        guard let index = self.items.index(where: { $0.id == item.id }) else { return }
-        
-        let indexPath = IndexPath(row: index, section: 0)
-        self.collectionView?.deleteItems(at: [indexPath])
-    }
 }
 
-extension FeedsCollectionDataProvider: FeedsCollectionDataProviderProtocol {
+//MARK: - UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout -
+extension FeedCollectionDataProvider: FeedCollectionDataProviderProtocol {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return self.items.count
@@ -82,18 +66,38 @@ extension FeedsCollectionDataProvider: FeedsCollectionDataProviderProtocol {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         let inset: CGFloat = min_inset
-
+        
         return UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
     }
 }
 
-extension FeedsCollectionDataProvider {
+//MARK: - Actions -
+extension FeedCollectionDataProvider {
     
     @objc func selectButtonAction(_ sender: UIButton) {
-        sender.isSelected = !sender.isSelected
-        items[sender.tag].isSelected = sender.isSelected
         let item = items[sender.tag]
-        
         didSelectPin?(item)
+    }
+}
+
+//MARK: - Update -
+extension FeedCollectionDataProvider {
+    
+    func updateCollectionView(with items: [FeedViewModelType]) {
+        self.items = items
+        self.collectionView?.reloadData()
+    }
+    
+    func insertNewItemInCollectionView(with item: FeedViewModelType) {
+        self.items.append(item)
+        let indexPath = IndexPath(row: self.items.count - 1, section: 0)
+        self.collectionView?.insertItems(at: [indexPath])
+        self.collectionView?.scrollToItem(at: indexPath, at: .right, animated: true)
+    }
+    
+    func deleteItemFromCollectionView(with item: FeedViewModelType) {
+        guard let index = self.items.index(where: { $0.id == item.id }) else { return }
+        self.items.remove(at: index)
+        self.collectionView?.reloadData()
     }
 }

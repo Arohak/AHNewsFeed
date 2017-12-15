@@ -1,56 +1,28 @@
 //
-//  ASLandingViewController.swift
+//  LandingViewController.swift
 //  AHNewsFeed
 //
-//  Created by Ara Hakobyan on 12/12/2017.
+//  Created by Ara Hakobyan on 15/12/2017.
 //  Copyright © 2017 Ara Hakobyan. All rights reserved.
 //
 
-import Foundation
+import UIKit
 import Alamofire
-import AsyncDisplayKit
 
-final class LandingViewController: ASViewController<ASDisplayNode> {
+final class LandingViewController: UIViewController {
     
     fileprivate typealias FeedsCallback = (_ model: LandingViewModelType) -> ()
-    fileprivate var landingViewModel: LandingViewModelType?
     fileprivate var tableDataProvider: FeedTableDataProvider?
-    fileprivate var collectionDataProvider: FeedsCollectionDataProvider?
+    fileprivate var collectionDataProvider: FeedCollectionDataProvider?
+    fileprivate var landingViewModel: LandingViewModelType?
+    fileprivate let landingView = LandingView()
     fileprivate var timer: DispatchSourceTimer?
     fileprivate var tuple = (pageSize: 10, loading: false)
-
-    lazy var tableNode: ASTableNode = {
-        let node = ASTableNode()
-        node.view.backgroundColor = bg_color
-        node.view.allowsSelection = true
-        node.view.separatorStyle = .singleLine
-        
-        return node
-    }()
-    
-    lazy var collectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        view.showsHorizontalScrollIndicator = false
-        view.backgroundColor = .white
-        view.register(cellType: FeedCollectionViewCell.self)
-        
-        return view
-    }()
-
-    init() {
-        super.init(nibName: nil, bundle: nil)
-    }
-    
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
     
     deinit {
         self.stopTimer()
     }
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -61,18 +33,18 @@ final class LandingViewController: ASViewController<ASDisplayNode> {
 //MARK: - Private Methods -
 extension LandingViewController {
     
-    fileprivate func baseConfig() {
+    private func baseConfig() {
         self.title = "News Feed"
+        self.view = landingView
         
-        configureNodes()
         configTableDataProvider()
         configCollectionDataProvider()
         setupInitialState()
         startTimer()
     }
-    
+
     fileprivate func setupInitialState() {
-        
+
         if APIHelper.isConnected() {
             getFeeds(showProgressHUD: true) { [weak self] viewModel in
                 self?.update(with: viewModel)
@@ -84,77 +56,34 @@ extension LandingViewController {
         }
     }
     
-    fileprivate func configureNodes() {
-        self.view.addSubview(collectionView)
-        self.view.addSubnode(tableNode)
-
-        collectionView.autoPinEdge(toSuperviewEdge: .top, withInset: 0)
-        collectionView.autoPinEdge(toSuperviewEdge: .left)
-        collectionView.autoPinEdge(toSuperviewEdge: .right)
-        collectionView.autoSetDimension(.height, toSize: collection_height)
-        
-        tableNode.view.autoPinEdge(.top, to: .bottom, of: collectionView)
-        tableNode.view.autoPinEdge(toSuperviewEdge: .left)
-        tableNode.view.autoPinEdge(toSuperviewEdge: .right)
-        tableNode.view.autoPinEdge(toSuperviewEdge: .bottom)
-    }
-    
     fileprivate func configTableDataProvider() {
-        tableDataProvider = FeedTableDataProvider(with: tableNode)
-        tableDataProvider?.didSelectRow = didSelectTableRow
+        tableDataProvider = FeedTableDataProvider(with: landingView.tableView)
+        tableDataProvider?.willDisplay = loadMore
         tableDataProvider?.didSelectPin = didSelectTablePin
-        tableDataProvider?.loadMore = loadMore
+        tableDataProvider?.didSelectRow = openDetailPage
     }
     
     fileprivate func configCollectionDataProvider() {
-        collectionDataProvider = FeedsCollectionDataProvider(with: collectionView)
-        collectionDataProvider?.didSelectRow = didSelectCollectionRow
+        collectionDataProvider = FeedCollectionDataProvider(with: landingView.collectionView)
         collectionDataProvider?.didSelectPin = didSelectCollectionPin
-    }
-    
-    fileprivate func updateTableNode() {
-        guard let items = landingViewModel?.tableViewFeeds else { return }
-        tableDataProvider?.updateTableNode(with: items)
-    }
-    
-    fileprivate func updateCollectionView() {
-        guard let items = landingViewModel?.collectionViewFeeds else { return }
-        collectionDataProvider?.updateCollectionView(with: items)
-        
-        if items.count > 2 {
-            let indexPath = IndexPath(row: items.count - 1, section: 0)
-            collectionDataProvider?.collectionView?.scrollToItem(at: indexPath, at: .right, animated: true)
-        }
+        collectionDataProvider?.didSelectRow = openDetailPage
     }
 
     fileprivate func update(with  viewModel: LandingViewModelType) {
         landingViewModel = viewModel
         
-        updateCollectionView()
-        updateTableNode()
-    }
-    
-    fileprivate func update(with items: [FeedViewModelType]) {
-        updateCollectionView()
-        tableDataProvider?.insertNewItemsInTableNode(with: items)
-    }
-    
-    fileprivate func openDetailPage(with item: FeedViewModelType) {
-        let vc = DetailViewController(with: item)
-        vc.didSelectDetailPagePin = didSelectDetailPagePin
-        self.navigationController?.pushViewController(vc, animated: true)
+        tableDataProvider?.updateTableView(with: viewModel.tableViewFeeds)
+        collectionDataProvider?.updateCollectionView(with: viewModel.collectionViewFeeds)
     }
 }
 
 //MARK: - Callbacks -
 extension LandingViewController {
-    
-    fileprivate func didSelectTableRow(_ item: FeedViewModelType) {
-        openDetailPage(with: item)
-    }
-    
-    fileprivate func didSelectCollectionRow(_ item: FeedViewModelType) {
-        openDetailPage(with: item)
+
+    fileprivate func openDetailPage(with item: FeedViewModelType) {
+        let vc = DetailViewController(with: item)
+        vc.didSelectDetailPagePin = didSelectDetailPagePin
+        self.navigationController?.pushViewController(vc, animated: true)
     }
     
     fileprivate func didSelectTablePin(_ item: FeedViewModelType) {
@@ -163,14 +92,10 @@ extension LandingViewController {
         DBHelper.updateFavoriteFeed(item)
         
         if item.isSelected {
-            landingViewModel?.collectionViewFeeds.append(item)
+            collectionDataProvider?.insertNewItemInCollectionView(with: item)
         } else {
-            guard let index = landingViewModel?.collectionViewFeeds.index(where: { $0.id == item.id }) else { return }
-            landingViewModel?.collectionViewFeeds.remove(at: index)
+            collectionDataProvider?.deleteItemFromCollectionView(with: item)
         }
-
-        // update collection view items
-        updateCollectionView()
     }
     
     fileprivate func didSelectCollectionPin(_ item: FeedViewModelType) {
@@ -178,12 +103,9 @@ extension LandingViewController {
         //update local feed
         DBHelper.updateFavoriteFeed(item)
         
-        guard let index = landingViewModel?.collectionViewFeeds.index(where: { $0.id == item.id }) else { return }
-        landingViewModel?.collectionViewFeeds.remove(at: index)
-
-        // update collection view items
-        updateCollectionView()
-
+        // delete collection item
+        collectionDataProvider?.deleteItemFromCollectionView(with: item)
+        
         // update correct table view item
         guard let row = landingViewModel?.tableViewFeeds.index(where: { $0.id == item.id }) else { return }
         tableDataProvider?.updateSelectButton(with: row, state: false)
@@ -197,15 +119,21 @@ extension LandingViewController {
         tableDataProvider?.updateSelectButton(with: row, state: item.isSelected)
     }
     
-    fileprivate func loadMore() {
-        if !tuple.loading {
+    fileprivate func loadMore(_ index: Int) {
+        if !tuple.loading && index == tuple.pageSize - 1 {
             tuple.pageSize += 10
             tuple.loading = true
+            landingView.activityIndicatorView.startAnimating()
+            landingView.tableView.tableFooterView?.isHidden = false
+            
             getFeeds { [weak self] viewModel in
                 self?.tuple.loading = (viewModel.tableViewFeeds.count == 0)
+                self?.landingView.activityIndicatorView.stopAnimating()
+                self?.landingView.tableView.tableFooterView?.isHidden = true
+                
                 if viewModel.tableViewFeeds.count > 0 {
                     self?.landingViewModel?.tableViewFeeds += viewModel.tableViewFeeds
-                    self?.update(with: viewModel.tableViewFeeds)
+                    self?.tableDataProvider?.insertNewItemsInTableView(with: viewModel.tableViewFeeds)
                 }
             }
         }
@@ -245,7 +173,7 @@ extension LandingViewController {
             }
         }
     }
-    
+
     private func getFeeds(showProgressHUD: Bool = false, callback: @escaping FeedsCallback) {
         NewsFeedEndpoint.getFeeds(showProgressHUD: showProgressHUD, pageSize: tuple.pageSize) { [weak self] data in
             let obj = Landing(data: data)
